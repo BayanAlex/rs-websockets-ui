@@ -12,10 +12,10 @@ class Room {
 }
 
 export class DB {
-    users: User[] = [];
-    rooms: Room[] = [];
-    games: Game[] = [];
-    winners = new Map<number, number>();
+    private users: User[] = [];
+    private rooms: Room[] = [];
+    public games: Game[] = [];
+    private winners = new Map<number, number>();
 
     regUser(name: string, password: string) {
         const existingUserIndex = this.users.findIndex(user => user.name === name);
@@ -42,8 +42,7 @@ export class DB {
         }
     }
 
-    addWinner(name: string) {
-        const index = this.users.findIndex(user => user.name === name);
+    addWinner(index: number) {
         this.winners.set(index, this.winners.get(index) + 1);
     }
 
@@ -72,20 +71,29 @@ export class DB {
     }
 
     createGame(userIndex: number, roomIndex: number) {
-        const game = new Game(this.rooms[roomIndex].userIndex, userIndex);
+        if (userIndex === this.rooms[roomIndex].userIndex) {
+            return null;
+        }
+        const idGame = this.games.length ? this.games[this.games.length - 1].id + 1 : 0;
+        const game = new Game(this.rooms[roomIndex].userIndex, userIndex, idGame);
         this.games.push(game);
         this.deleteRoom(roomIndex);
-        return {
-            idGame: this.games.length - 1,
-            idPlayer: userIndex
-        }
+        const [player1, player2] = game.getPlayers();
+        
+        return [
+            {
+                idGame: idGame,
+                idPlayer: player1
+            },
+            {
+                idGame: idGame,
+                idPlayer: player2
+            }
+        ];
     }
 
-    getGamePlayers(gameId: number) {
-        return this.games[gameId].getPlayers();
-    }
-
-    addShips(gameId: number, userIndex: number, ships: any) {
-        return this.games[gameId].addShips(userIndex, ships);
+    deleteGame(gameId: number) {
+        const index = this.games.findIndex((game) => game.id === gameId);
+        this.games.splice(index, 1);
     }
 }
