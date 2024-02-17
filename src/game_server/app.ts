@@ -3,8 +3,8 @@ import { Controller } from './controller/controller';
 import { DB } from './db';
 
 interface WsClient {
-    ws: WebSocket,
-    index: number
+    ws: WebSocket;
+    index: number;
 }
 
 class WsClients {
@@ -51,7 +51,7 @@ export class App {
         const sendResponse = (socket: WebSocket, response: any) => {
             const dataStr = JSON.stringify(response.payload);
             socket.send(dataStr);
-            if (!response.broadcast) {
+            if (response.receivers !== 'broadcast') {
                 console.log(`<- Send to client id ${this.clients.getIndex(socket)}:`, response.payload, '\n');
             }
         };
@@ -64,8 +64,8 @@ export class App {
             console.log(`New client connected`);
 
             ws.on('error', (error) => {
-                ws.close();
                 console.error(error);
+                ws.close();
             });
             
             ws.on('message',(data) => {

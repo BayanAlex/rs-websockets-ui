@@ -1,7 +1,32 @@
 import { DB } from "../db";
 import { Game } from "./game";
 
+class Session {
+    constructor(public id: number, public userIndex: number) { }
+}
+
+class Sessions {
+    sessions: Session[] = [];
+
+    addSession(userIndex: number) {
+        const lastId = this.sessions[this.sessions.length - 1]?.id;
+        const id = lastId !== undefined ? lastId + 1 : 0;
+        this.sessions.push(new Session(id, userIndex));
+        return id;
+    }
+
+    deleteSession(id: number) {
+        this.sessions.splice(this.sessions.findIndex((session) => session.id === id), 1);
+    }
+
+    getUserIndex(id: number) {
+        return this.sessions.find((session) => session.id === id).userIndex;
+    }
+}
+
 export class Controller {
+    sessions = new Sessions();
+
     constructor(private db: DB) { }
 
     public processRequest(userIndex: number | null, request: any) {
@@ -27,25 +52,30 @@ export class Controller {
                     responses.push(this.makeResponse('reg', data));
                     break;
                 }
+                const sessionId = this.sessions.addSession(user.index);
+                user.index = sessionId;
                 responses.push(this.makeResponse('reg', user));
-                responses.push(this.makeResponse('update_room', this.db.getRooms(), 'broadcast'));
+                responses.push(this.makeResponse('update_room', this.getRooms(), 'broadcast'));
                 responses.push(this.makeResponse('update_winners', this.db.getWinners(), 'broadcast'));
                 break;
 
             case 'create_room':
-                this.db.createRoom(userIndex);
-                responses.push(this.makeResponse('update_room', this.db.getRooms(), 'broadcast'));
+                if (this.db.createRoom(userIndex)) {
+                    responses.push(this.makeResponse('update_room', this.getRooms(), 'broadcast'));
+                }
                 break;
 
             case 'add_user_to_room':
-                players = this.db.createGame(userIndex, dataObj.data.indexRoom);
-                if (!players) {
+                const userInDb = this.sessions.getUserIndex(userIndex);
+                const roomUsers = this.getRooms()[dataObj.data.indexRoom].roomUsers;
+                const sameUser = this.sessions.getUserIndex(roomUsers[0].index) === userInDb;
+                if (sameUser) {
                     break;
                 }
+                players = this.db.createGame(userIndex, dataObj.data.indexRoom);
 
-                responses.push(this.makeResponse('update_room', this.db.getRooms(), 'broadcast'));
-                player1 = players[0].idPlayer;
-                player2 = players[1].idPlayer;
+                responses.push(this.makeResponse('update_room', this.getRooms(), 'broadcast'));
+                [ player1, player2 ] = players.map((player) => player.idPlayer);
                 responses.push(this.makeResponse('create_game', players[0], [player1]));
                 responses.push(this.makeResponse('create_game', players[1], [player2]));
                 break;
@@ -58,8 +88,7 @@ export class Controller {
                 }
 
                 players = result.playersData;
-                player1 = players[0].currentPlayerIndex;
-                player2 = players[1].currentPlayerIndex;
+                [ player1, player2 ] = players.map((player: any) => player.currentPlayerIndex);
                 responses.push(this.makeResponse('start_game', players[0], [player1]));
                 responses.push(this.makeResponse('start_game', players[1], [player2]));
                 responses.push(this.makeResponse('turn', result.turn, [player1, player2]));
@@ -80,7 +109,7 @@ export class Controller {
                 }
                 
                 if (result.win) {
-                    this.db.addWinner(userIndex);
+                    this.db.addWinner(this.sessions.getUserIndex(userIndex));
                     responses.push(this.makeResponse('update_winners', this.db.getWinners(), 'broadcast'));
                     responses.push(this.makeResponse('finish', result.win, players));
                     this.db.deleteGame(game.id);
@@ -91,6 +120,14 @@ export class Controller {
         }
 
         return responses;
+    }
+
+    private getRooms() {
+        const rooms = this.db.getRooms();
+        for (const room of rooms) {
+            (room as any).roomUsers[0].name = this.db.getUser(this.sessions.getUserIndex(room.roomUsers[0].index)).name;
+        }
+        return rooms;
     }
 
     private makeResponse(type: string, data: any, receivers?: number[] | 'broadcast') {
@@ -105,17 +142,17 @@ export class Controller {
     }
 
     closeUserSessions(userIndex: number) {
-        const roomId = this.db.getRooms().find((room) => room.roomUsers.find((user) => user.index === userIndex))?.roomId;
+        const roomId = this.getRooms().find((room) => room.roomUsers[0].index === userIndex)?.roomId;
         if (roomId !== undefined) {
             this.db.deleteRoom(roomId);
-            return [this.makeResponse('update_room', this.db.getRooms(), 'broadcast')];
+            return [this.makeResponse('update_room', this.getRooms(), 'broadcast')];
         }
 
         const game = this.db.games.find((game) => game.getPlayers().find((player) => player === userIndex));
         if (game !== undefined) {
             const responses: any[] = [];
             const opponent = game.getOpponent(userIndex);
-            this.db.addWinner(opponent);
+            this.db.addWinner(this.sessions.getUserIndex(opponent));
             responses.push(this.makeResponse('update_winners', this.db.getWinners(), 'broadcast'));
             responses.push(this.makeResponse('finish', { winPlayer: opponent }, [opponent]));
             this.db.deleteGame(game.id);

@@ -49,11 +49,15 @@ export class DB {
     getWinners() {
         return Array.from(this.winners.entries())
             .map(winner => ({ name: this.users[winner[0]].name, wins: winner[1] }))
-            .sort((a, b) => a.wins > b.wins ? 1 : -1);
+            .sort((a, b) => a.wins < b.wins ? 1 : -1);
     }
 
     createRoom(userIndex: number) {
+        if (this.rooms.find((room) => room.userIndex === userIndex)) {
+            return false;
+        }
         this.rooms.push(new Room(userIndex));
+        return true;
     }
 
     deleteRoom(roomIndex: number) {
@@ -62,18 +66,14 @@ export class DB {
 
     getRooms() {
         return this.rooms.map((room, index) => {
-            const user = this.getUser(room.userIndex);
             return {
                 roomId: index,
-                roomUsers: [{ name: user.name, index: user.index }]
+                roomUsers: [{ index: room.userIndex }]
             }
         });
     }
 
     createGame(userIndex: number, roomIndex: number) {
-        if (userIndex === this.rooms[roomIndex].userIndex) {
-            return null;
-        }
         const idGame = this.games.length ? this.games[this.games.length - 1].id + 1 : 0;
         const game = new Game(this.rooms[roomIndex].userIndex, userIndex, idGame);
         this.games.push(game);
