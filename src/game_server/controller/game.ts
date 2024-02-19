@@ -1,22 +1,23 @@
 import { random } from "../utils";
+import { Bot } from "./bot";
 
-const ROWS_COUNT = 10;
-const COLUMNS_COUNT = 10;
+export const ROWS_COUNT = 10;
+export const COLUMNS_COUNT = 10;
 
-interface Cell {
+export interface Cell {
     x: number;
     y: number;
 }
 
 interface ShipCell extends Cell {
-    shot?: boolean
+    shot?: boolean;
 }
 
 class Ship {
     cells: ShipCell[] = [];
     killed = false;
 
-    constructor(x: number, y: number, private length: number, private vertical: boolean) {
+    constructor(x: number, y: number, private length: number, vertical: boolean) {
         for (let i = 0; i < length; i += 1) {
             this.cells.push(vertical ? { x, y: y + i } : { x: x + i, y });
         }
@@ -66,10 +67,9 @@ class Field {
             status?: 'miss' | 'killed' | 'shot'
         }[] = [{ position: { x, y } }];
 
+        this.shots.push({ x, y });
         for (const ship of this.ships) {
             const status = ship.attack(x, y);
-            this.shots.push({ x, y });
-
             if (status === 'shot' || status === 'killed') {
                 resultCells[0].status = status;
                 if (status === 'killed') {
@@ -109,6 +109,7 @@ class Player {
 export class Game {
     private players: Map<number, Player>;
     playerTurn: number;
+    gameWithBot: boolean;
 
     constructor(
         playerIndex1: number,
@@ -119,6 +120,7 @@ export class Game {
         this.players.set(playerIndex1, new Player());
         this.players.set(playerIndex2, new Player());
         this.playerTurn = playerIndex1;
+        this.gameWithBot = playerIndex2 === Bot.id;
     }
 
     addShips(playerIndex: number, ships: any) {
@@ -154,6 +156,10 @@ export class Game {
         return Array.from(this.players.keys());
     }
 
+    getShots(index: number) {
+        return this.players.get(index).field.shots;
+    }
+
     getOpponent(playerIndex: number) {
         return this.getPlayers().find((index) => index !== playerIndex);
     }
@@ -183,7 +189,7 @@ export class Game {
         return {
             win: win? { winPlayer: playerIndex } : null,
             turn: { currentPlayer: this.playerTurn },
-            cells: response.map(v => ({ ...v, currentPlayer: playerIndex })) 
+            cells: response.map(v => ({ ...v, currentPlayer: playerIndex }))
         };
     }
 

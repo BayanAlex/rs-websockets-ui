@@ -1,6 +1,9 @@
 import { WebSocket, WebSocketServer } from 'ws';
 import { Controller } from './controller/controller';
 import { DB } from './db';
+import { delay } from './utils';
+
+const BOT_SHOT_DELAY = 500;
 
 interface WsClient {
     ws: WebSocket;
@@ -19,7 +22,7 @@ class WsClients {
     }
 
     getWs(index: number) {
-        return this.clients.find(client => client.index === index).ws;
+        return this.clients.find(client => client.index === index)?.ws;
     }
 
     delete(ws: WebSocket) {
@@ -48,11 +51,26 @@ export class App {
     private initServer(port: number) {
         this.wsServer = new WebSocketServer({ port });
         
-        const sendResponse = (socket: WebSocket, response: any) => {
-            const dataStr = JSON.stringify(response.payload);
-            socket.send(dataStr);
+        const sendResponse = async (socket: WebSocket, response: any) => {
+            if (response.delay) {
+                await delay(BOT_SHOT_DELAY);
+            }
+            const sendData = { ...response.payload };
+            sendData.data = JSON.stringify(sendData.data);
+            const errorMsg = 'Error during sending data';
+            try {
+                if (socket) {
+                    socket.send(JSON.stringify(sendData));
+                } else {
+                    console.log(errorMsg);
+                }
+            } catch (error) {
+                console.log(errorMsg);
+                return;
+            }
+
             if (response.receivers !== 'broadcast') {
-                console.log(`<- Send to client id ${this.clients.getIndex(socket)}:`, response.payload, '\n');
+                console.log(`<- Sent to client id ${this.clients.getIndex(socket)}:`, response.payload, '\n');
             }
         };
         
@@ -62,54 +80,60 @@ export class App {
 
         this.wsServer.on('connection', (ws) => {
             console.log(`New client connected`);
+            let mute = false;
 
             ws.on('error', (error) => {
                 console.error(error);
                 ws.close();
             });
             
-            ws.on('message',(data) => {
+            ws.on('message', async (data) => {
                 const clientId = this.clients.getIndex(ws);
                 console.log(`-> Received${clientId >= 0 ? ` from client id ${clientId}` : ''}:`, JSON.parse(data.toString()), '\n');
 
+                if (mute) {
+                    return;    
+                }
+
                 const id = this.clients.getIndex(ws);
+                mute = true;
                 const responses = this.controller.processRequest(id, data);
-                for (const response of responses) {
+                for (let i = 0; i < responses.length; i += 1) {
+                    const response = responses[i];
+
                     if (response.payload.type === 'reg' && !response.payload.data.error) {
                         this.clients.add(ws, response.payload.data.index);
                     }
-                    response.payload.data = JSON.stringify(response.payload.data);
 
-                    if (!response.receivers) {
-                        sendResponse(ws, response);
+                    if (!response.receivers.length) {
+                        await sendResponse(ws, response);
                         continue;
                     }
                     
                     if (response.receivers === 'broadcast') {
-                        this.clients.getAllWs().forEach(ws => sendResponse(ws, response));
+                        this.clients.getAllWs().forEach(async (ws) => await sendResponse(ws, response));
                         console.log(`<- Broadcast:`, response.payload, '\n');
                     } else {
                         for (const receiverId of response.receivers) {
-                            sendResponse(this.clients.getWs(receiverId), response);
+                            await sendResponse(this.clients.getWs(receiverId), response);
                         }
                     }
                 }
+                mute = false;
             });
 
-            ws.on('close', () => {
+            ws.on('close', async () => {
                 const userId = this.clients.getIndex(ws);
                 this.clients.delete(ws);
-                console.log(`Client ${userId >= 0 ? `id ${userId} ` : ''}disconnected`);
+                console.log(`Client ${userId !== null ? `id ${userId} ` : ''}disconnected`);
                 const responses = this.controller.closeUserSessions(userId);
                 for (const response of responses) {
-                    response.payload.data = JSON.stringify(response.payload.data);
-                    
                     if (response.receivers === 'broadcast') {
                         this.clients.getAllWs().forEach(ws => sendResponse(ws, response));
                         console.log(`<- Broadcast:`, response.payload, '\n');
                     } else {
                         for (const receiverId of response.receivers) {
-                            sendResponse(this.clients.getWs(receiverId), response);
+                            await sendResponse(this.clients.getWs(receiverId), response);
                         }
                     }
                 }

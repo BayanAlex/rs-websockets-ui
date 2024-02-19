@@ -73,11 +73,20 @@ export class DB {
         });
     }
 
-    createGame(userIndex: number, roomIndex: number) {
+    createGame(userIndex: number, roomIndex?: number) {
+        let game: Game;
         const idGame = this.games.length ? this.games[this.games.length - 1].id + 1 : 0;
-        const game = new Game(this.rooms[roomIndex].userIndex, userIndex, idGame);
+        const userRoomIndex = this.rooms.findIndex((room) => room.userIndex === userIndex);
+        if (roomIndex !== undefined) {
+            game = new Game(this.rooms[roomIndex].userIndex, userIndex, idGame);
+            this.deleteRoom(roomIndex);
+        } else {
+            game = new Game(userIndex, -1, idGame);
+        }
+        if (userRoomIndex > -1) {
+            this.deleteRoom(userRoomIndex);
+        }
         this.games.push(game);
-        this.deleteRoom(roomIndex);
         const [player1, player2] = game.getPlayers();
         
         return [
@@ -90,6 +99,10 @@ export class DB {
                 idPlayer: player2
             }
         ];
+    }
+
+    getGame(id: number) {
+        return this.games.find((game) => game.id === id);
     }
 
     deleteGame(gameId: number) {
