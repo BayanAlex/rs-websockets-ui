@@ -1,8 +1,9 @@
 import { WebSocket, WebSocketServer } from "ws";
 import { delay } from "./utils";
 import { Controller } from "./controller/controller";
-import { RegResponseError, RegResponseData } from "../models/protocol";
+import { RegResponseError, RegResponseData, FeRequest } from "../models/protocol";
 import { ResponseObj } from "../models/controller";
+import { inspect } from "util";
 
 const BOT_SHOT_DELAY = 500;
 
@@ -45,8 +46,12 @@ export class WsServer {
 
     private initServer(port: number): void {
         this.wsServer = new WebSocketServer({ port });
+
+        const deepObjectToStr = (obj: any): string => {
+            return inspect(obj, false, null, true);
+        }
         
-        const sendResponse = async (socket: WebSocket, response: ResponseObj) => {
+        const sendResponse = async (socket: WebSocket, response: ResponseObj): Promise<void> => {
             if (response.delay) {
                 await delay(BOT_SHOT_DELAY);
             }
@@ -65,7 +70,7 @@ export class WsServer {
             }
 
             if (response.receivers !== 'broadcast') {
-                console.log(`<- Sent to client id ${this.clients.getId(socket)}:`, response.payload, '\n');
+                console.log(`<- Sent to client id ${this.clients.getId(socket)}:`, deepObjectToStr(response.payload), '\n');
             }
         };
         
@@ -84,7 +89,11 @@ export class WsServer {
             
             ws.on('message', async (data: string) => {
                 const clientId = this.clients.getId(ws);
-                console.log(`-> Received${clientId >= 0 ? ` from client id ${clientId}` : ''}:`, JSON.parse(data.toString()), '\n');
+                const dataObj: FeRequest = JSON.parse(data);
+                if (dataObj.data) {
+                    dataObj.data = JSON.parse(dataObj.data as any as string);
+                }
+                console.log(`-> Received${clientId >= 0 ? ` from client id ${clientId}` : ''}:`, deepObjectToStr(dataObj), '\n');
 
                 if (mute) {
                     return;    
@@ -92,7 +101,7 @@ export class WsServer {
 
                 mute = true;
                 const id = this.clients.getId(ws);
-                const responses = this.controller.processRequest(id, data);
+                const responses = this.controller.processRequest(id, dataObj);
                 for (let i = 0; i < responses.length; i += 1) {
                     const response = responses[i];
 

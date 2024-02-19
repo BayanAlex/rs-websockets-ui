@@ -6,7 +6,6 @@ import {
     FeReponseData, 
     FeReponseType, 
     FeRequest, 
-    FeRequestData, 
     FeResponse, 
     UpdateRoomResponse 
 } from "../../models/protocol";
@@ -43,21 +42,16 @@ export class Controller {
 
     constructor(private db: DB) {}
 
-    public processRequest(userId: number | null, request: string): ResponseObj[] {
-        const dataObj: FeRequest = JSON.parse(request);
-        if (dataObj.data) {
-            dataObj.data = JSON.parse(dataObj.data as any as string) as Exclude<FeRequestData, ''>;
-        }
-
+    public processRequest(userId: number | null, request: FeRequest): ResponseObj[] {
         const responses: ResponseObj[] = [];
         let players: number[] | AddShipsResult['playersData'] | CreateGameResponse['data'][];
         let player1: number;
         let player2: number;
         let result: AddShipsResult | AttackResult;
         let game: Game;
-        switch (dataObj.type) {
+        switch (request.type) {
             case 'reg':
-                const user = this.db.regUser(dataObj.data.name, dataObj.data.password);
+                const user = this.db.regUser(request.data.name, request.data.password);
                 if (!user) {
                     const data = {
                         error: true,
@@ -82,12 +76,12 @@ export class Controller {
 
             case 'add_user_to_room':
                 const userInDb = this.sessions.getUserId(userId);
-                const roomUsers = this.getRooms()[dataObj.data.indexRoom].roomUsers;
+                const roomUsers = this.getRooms()[request.data.indexRoom].roomUsers;
                 const sameUser = this.sessions.getUserId(roomUsers[0].index) === userInDb;
                 if (sameUser) {
                     break;
                 }
-                players = this.db.createGame(userId, dataObj.data.indexRoom);
+                players = this.db.createGame(userId, request.data.indexRoom);
 
                 responses.push(this.makeResponse('update_room', this.getRooms(), 'broadcast'));
                 [ player1, player2 ] = players.map((player) => player.idPlayer);
@@ -96,11 +90,11 @@ export class Controller {
                 break;
 
             case 'add_ships':
-                game = this.db.games[dataObj.data.gameId];
+                game = this.db.games[request.data.gameId];
                 if (!game) {
                     break;
                 }
-                result = game.addShips(dataObj.data.indexPlayer, dataObj.data.ships);
+                result = game.addShips(request.data.indexPlayer, request.data.ships);
                 if (!result) {
                     break;
                 }
@@ -108,19 +102,21 @@ export class Controller {
                 players = result.playersData;
                 [ player1, player2 ] = players.map((player: any) => player.currentPlayerIndex);
                 responses.push(this.makeResponse('start_game', players[0], [player1]));
-                responses.push(this.makeResponse('start_game', players[1], [player2]));
+                if (player2 !== Bot.id) {
+                    responses.push(this.makeResponse('start_game', players[1], [player2]));
+                }
                 responses.push(this.makeResponse('turn', result.turn, [player1, player2]));
                 break;
 
             case 'attack':
             case 'randomAttack':
-                const { gameId, indexPlayer } = dataObj.data;
+                const { gameId, indexPlayer } = request.data;
                 game = this.db.games[gameId];
                 if (!game) {
                     break;
                 }
 
-                result = dataObj.type === 'attack' ? game.attack(indexPlayer, dataObj.data.x, dataObj.data.y) : game.randomAttack(indexPlayer);
+                result = request.type === 'attack' ? game.attack(indexPlayer, request.data.x, request.data.y) : game.randomAttack(indexPlayer);
                 if (!result) {
                     break;
                 }
