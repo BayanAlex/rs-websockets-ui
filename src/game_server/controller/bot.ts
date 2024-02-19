@@ -1,3 +1,5 @@
+import { AttackResult, AttackStatus } from "../models/game";
+import { ShipData } from "../models/protocol";
 import { random } from "../utils";
 import { COLUMNS_COUNT, Cell, Game, ROWS_COUNT } from "./game";
 
@@ -10,8 +12,8 @@ export class Bot {
         this.generateShips();
     }
 
-    private generateShips() {
-        const ships: any[] = [];
+    private generateShips(): void {
+        const ships: ShipData[] = [];
         const busyCells: Cell[] = [];
 
         const generateShip = (length: 1 | 2 | 3 | 4) => {
@@ -46,9 +48,9 @@ export class Bot {
         this.game.addShips(Bot.id, ships);
     }
 
-    attack() {
-        const resultCells: any[] = [];
-        let result: any;
+    attack(): AttackResult {
+        const resultCells: AttackStatus[] = [];
+        let result: AttackResult;
         const checkShots = (cell: Cell) => {
             return !this.game.getShots(this.game.getOpponent(Bot.id)).find(((shot) => shot.x === cell.x && shot.y === cell.y));
         }
@@ -97,17 +99,14 @@ export class Bot {
                         const axis = vertical ? 'y' : 'x';
                         this.nextAttack[axis] = shotCell[axis] > this.startShot[axis] ? this.startShot[axis] - 1 : this.startShot[axis] + 1;
                         continue;
-                        
                     }
                 }
 
                 const potentialTargets = [
-
                     { x: this.startShot.x - 1, y: this.startShot.y },
                     { x: this.startShot.x + 1, y: this.startShot.y },
                     { x: this.startShot.x, y: this.startShot.y - 1 },
                     { x: this.startShot.x, y: this.startShot.y + 1 },
-
                 ].filter((cell) => cell.x >= 0 && cell.x < COLUMNS_COUNT && cell.y >=0 && cell.y < ROWS_COUNT);
                 for (let i = 0; i < potentialTargets.length; i += 1) {
                     const potentialTarget = potentialTargets[i];

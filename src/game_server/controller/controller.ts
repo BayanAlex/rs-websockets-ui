@@ -1,9 +1,20 @@
 import { DB } from "../db";
+import { ResponseObj } from "../models/controller";
+import { AddShipsResult, AttackResult } from "../models/game";
+import { 
+    CreateGameResponse, 
+    FeReponseData, 
+    FeReponseType, 
+    FeRequest, 
+    FeRequestData, 
+    FeResponse, 
+    UpdateRoomResponse 
+} from "../models/protocol";
 import { Bot } from "./bot";
 import { Game } from "./game";
 
 class Session {
-    constructor(public id: number, public userIndex: number) { }
+    constructor(public id: number, public userIndex: number) {}
 }
 
 class Sessions {
@@ -30,19 +41,19 @@ export class Controller {
     sessions = new Sessions();
     bots = new Map<number, Bot>();
 
-    constructor(private db: DB) { }
+    constructor(private db: DB) {}
 
-    public processRequest(userIndex: number | null, request: any) {
-        const dataObj = JSON.parse(request.toString());
+    public processRequest(userIndex: number | null, request: string): ResponseObj[] {
+        const dataObj: FeRequest = JSON.parse(request);
         if (dataObj.data) {
-            dataObj.data = JSON.parse(dataObj.data);
+            dataObj.data = JSON.parse(dataObj.data as any as string) as Exclude<FeRequestData, ''>;
         }
 
-        const responses: any[] = [];
-        let players;
+        const responses: ResponseObj[] = [];
+        let players: number[] | AddShipsResult['playersData'] | CreateGameResponse['data'][];
         let player1: number;
         let player2: number;
-        let result: any;
+        let result: AddShipsResult | AttackResult;
         let game: Game;
         switch (dataObj.type) {
             case 'reg':
@@ -102,13 +113,13 @@ export class Controller {
 
             case 'attack':
             case 'randomAttack':
-                const { gameId, x, y, indexPlayer } = dataObj.data;
+                const { gameId, indexPlayer } = dataObj.data;
                 game = this.db.games[gameId];
                 if (!game) {
                     break;
                 }
 
-                result = dataObj.type === 'attack' ? game.attack(indexPlayer, x, y) : game.randomAttack(indexPlayer);
+                result = dataObj.type === 'attack' ? game.attack(indexPlayer, dataObj.data.x, dataObj.data.y) : game.randomAttack(indexPlayer);
                 if (!result) {
                     break;
                 }
@@ -121,10 +132,8 @@ export class Controller {
 
                 if (result.win) {
                     const winPlayer = result.win.winPlayer;
-                    // if (winPlayer !== Bot.id) {
-                        this.db.addWinner(this.sessions.getUserIndex(winPlayer));
-                        responses.push(this.makeResponse('update_winners', this.db.getWinners(), 'broadcast'));
-                    // }
+                    this.db.addWinner(this.sessions.getUserIndex(winPlayer));
+                    responses.push(this.makeResponse('update_winners', this.db.getWinners(), 'broadcast'));
                     responses.push(this.makeResponse('finish', result.win, players));
                     if (game.gameWithBot) {
                         this.bots.delete(game.id);
@@ -169,16 +178,16 @@ export class Controller {
         return responses;
     }
 
-    private getRooms() {
+    private getRooms(): UpdateRoomResponse['data'] {
         const rooms = this.db.getRooms();
         for (const room of rooms) {
-            (room as any).roomUsers[0].name = this.db.getUser(this.sessions.getUserIndex(room.roomUsers[0].index)).name;
+            room.roomUsers[0].name = this.db.getUser(this.sessions.getUserIndex(room.roomUsers[0].index)).name;
         }
 
         return rooms;
     }
 
-    private makeResponse(type: string, data: any, receivers: number[] | 'broadcast', delay?: boolean) {
+    private makeResponse(type: FeReponseType, data: FeReponseData, receivers: number[] | 'broadcast', delay?: boolean): ResponseObj {
         if (Array.isArray(receivers) && receivers.includes(Bot.id)) {
             receivers.splice(receivers.indexOf(Bot.id), 1);
         }
@@ -190,11 +199,11 @@ export class Controller {
                 type,
                 data,
                 id: 0
-            }
+            } as FeResponse
         };
     }
 
-    closeUserSessions(userIndex: number) {
+    closeUserSessions(userIndex: number): ResponseObj[] {
         const roomId = this.getRooms().find((room) => room.roomUsers[0].index === userIndex)?.roomId;
         if (roomId !== undefined) {
             this.db.deleteRoom(roomId);
@@ -209,7 +218,7 @@ export class Controller {
                 return [];
             }
 
-            const responses: any[] = [];
+            const responses: ResponseObj[] = [];
             const opponent = game.getOpponent(userIndex);
             this.db.addWinner(this.sessions.getUserIndex(opponent));
             responses.push(this.makeResponse('update_winners', this.db.getWinners(), 'broadcast'));

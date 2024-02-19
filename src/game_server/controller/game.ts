@@ -1,3 +1,10 @@
+import { 
+    AddShipsResult, 
+    AttackResult, 
+    AttackStatus, 
+    ShipStatus,
+    ShipData
+} from "../models/game";
 import { random } from "../utils";
 import { Bot } from "./bot";
 
@@ -23,7 +30,7 @@ class Ship {
         }
     }
 
-    attack(x: number, y: number) {
+    attack(x: number, y: number): ShipStatus {
         const cell = this.cells.find(cell => cell.x === x && cell.y === y);
         if (cell) {
             cell.shot = true;
@@ -34,7 +41,7 @@ class Ship {
         return 'miss';
     }
 
-    getNearCells() {
+    getNearCells(): Cell[] {
         const startCell = this.cells[0];
         const endCell = this.cells[this.length - 1];
         const xStart = startCell.x > 0 ? startCell.x - 1 : 0;
@@ -58,14 +65,8 @@ class Field {
     ships: Ship[] = [];
     shots: Cell[] = [];
 
-    attack(x: number, y: number) {
-        const resultCells: {
-            position: {
-                x: number,
-                y: number
-            },
-            status?: 'miss' | 'killed' | 'shot'
-        }[] = [{ position: { x, y } }];
+    attack(x: number, y: number): Omit<AttackStatus, 'currentPlayer'>[] {
+        const resultCells: Omit<AttackStatus, 'currentPlayer'>[] = [{ position: { x, y } }];
 
         this.shots.push({ x, y });
         for (const ship of this.ships) {
@@ -96,14 +97,14 @@ class Field {
         return resultCells;
     }
 
-    allKilled() {
+    allKilled(): boolean {
         return this.ships.every((ship) => ship.killed);
     }
 }
 
 class Player {
     field = new Field();
-    shipsRawData?: any;
+    shipsRawData?: ShipData[];
 }
 
 export class Game {
@@ -123,7 +124,7 @@ export class Game {
         this.gameWithBot = playerIndex2 === Bot.id;
     }
 
-    addShips(playerIndex: number, ships: any) {
+    addShips(playerIndex: number, ships: ShipData[]): AddShipsResult {
         const shipsOnField = this.players.get(playerIndex).field.ships;
         for (const ship of ships) {
             const x = ship.position.x;
@@ -152,23 +153,23 @@ export class Game {
         }
     }
 
-    getPlayers() {
+    getPlayers(): number[] {
         return Array.from(this.players.keys());
     }
 
-    getShots(index: number) {
+    getShots(index: number): Cell[] {
         return this.players.get(index).field.shots;
     }
 
-    getOpponent(playerIndex: number) {
+    getOpponent(playerIndex: number): number {
         return this.getPlayers().find((index) => index !== playerIndex);
     }
 
-    private changeTurn() {
+    private changeTurn(): void {
         this.playerTurn = this.getOpponent(this.playerTurn);
     }
 
-    attack(playerIndex: number, x: number, y: number) {
+    attack(playerIndex: number, x: number, y: number): AttackResult {
         if (playerIndex !== this.playerTurn) {
             return null;
         }
@@ -193,7 +194,7 @@ export class Game {
         };
     }
 
-    randomAttack(playerIndex: number) {
+    randomAttack(playerIndex: number): AttackResult {
         const allCells: Cell[] = [];
         let freeCells: Cell[];
         for (let y = 0; y < ROWS_COUNT; y += 1) {
