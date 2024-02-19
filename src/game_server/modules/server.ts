@@ -62,10 +62,10 @@ export class WsServer {
                 if (socket) {
                     socket.send(JSON.stringify(sendData));
                 } else {
-                    console.log(errorMsg);
+                    console.error(errorMsg);
                 }
             } catch (error) {
-                console.log(errorMsg);
+                console.error(errorMsg);
                 return;
             }
 
@@ -96,7 +96,7 @@ export class WsServer {
                 console.log(`-> Received${clientId >= 0 ? ` from client id ${clientId}` : ''}:`, deepObjectToStr(dataObj), '\n');
 
                 if (mute) {
-                    return;    
+                    return;
                 }
 
                 mute = true;

@@ -6,5 +6,5 @@ const GAME_PORT = 3000;
 
 new App(GAME_PORT);
 httpServer.listen(HTTP_PORT, () => {
-    console.log(`Started static HTTP server on the ${HTTP_PORT} port`);
+    console.log(`Started static HTTP server on the ${HTTP_PORT} port. Open UI: http://localhost:${HTTP_PORT}`);
 });
