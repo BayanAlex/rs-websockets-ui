@@ -4,7 +4,7 @@ import {
     AttackStatus, 
     ShipStatus,
     ShipData
-} from "../models/game";
+} from "../../models/game";
 import { random } from "../utils";
 import { Bot } from "./bot";
 
@@ -113,19 +113,19 @@ export class Game {
     gameWithBot: boolean;
 
     constructor(
-        playerIndex1: number,
-        playerIndex2: number,
+        playerId1: number,
+        playerId2: number,
         public id: number
     ) { 
         this.players = new Map();
-        this.players.set(playerIndex1, new Player());
-        this.players.set(playerIndex2, new Player());
-        this.playerTurn = playerIndex1;
-        this.gameWithBot = playerIndex2 === Bot.id;
+        this.players.set(playerId1, new Player());
+        this.players.set(playerId2, new Player());
+        this.playerTurn = playerId1;
+        this.gameWithBot = playerId2 === Bot.id;
     }
 
-    addShips(playerIndex: number, ships: ShipData[]): AddShipsResult {
-        const shipsOnField = this.players.get(playerIndex).field.ships;
+    addShips(playerId: number, ships: ShipData[]): AddShipsResult {
+        const shipsOnField = this.players.get(playerId).field.ships;
         for (const ship of ships) {
             const x = ship.position.x;
             const y = ship.position.y;
@@ -134,16 +134,16 @@ export class Game {
             shipsOnField.push(new Ship(x, y, length, vertical));
         }
 
-        this.players.get(playerIndex).shipsRawData = ships;
+        this.players.get(playerId).shipsRawData = ships;
         const allPlayersReady = Array.from(this.players.values()).every((player) => !!player.shipsRawData);
         if (!allPlayersReady) {
             return null;
         }
 
         const playersData = this.getPlayers()
-            .map(currentPlayerIndex => ({ 
-                    currentPlayerIndex, 
-                    ships: this.players.get(currentPlayerIndex).shipsRawData 
+            .map(currentPlayerId => ({ 
+                    currentPlayerIndex: currentPlayerId, 
+                    ships: this.players.get(currentPlayerId).shipsRawData 
                 })
             );
 
@@ -157,24 +157,24 @@ export class Game {
         return Array.from(this.players.keys());
     }
 
-    getShots(index: number): Cell[] {
-        return this.players.get(index).field.shots;
+    getShots(playerId: number): Cell[] {
+        return this.players.get(playerId).field.shots;
     }
 
-    getOpponent(playerIndex: number): number {
-        return this.getPlayers().find((index) => index !== playerIndex);
+    getOpponent(playerId: number): number {
+        return this.getPlayers().find((id) => id !== playerId);
     }
 
     private changeTurn(): void {
         this.playerTurn = this.getOpponent(this.playerTurn);
     }
 
-    attack(playerIndex: number, x: number, y: number): AttackResult {
-        if (playerIndex !== this.playerTurn) {
+    attack(playerId: number, x: number, y: number): AttackResult {
+        if (playerId !== this.playerTurn) {
             return null;
         }
 
-        const field = this.players.get(this.getOpponent(playerIndex)).field;
+        const field = this.players.get(this.getOpponent(playerId)).field;
         if (field.shots.find((shot) => shot.x === x && shot.y === y)) {
             return null;
         }
@@ -188,13 +188,13 @@ export class Game {
         }
 
         return {
-            win: win? { winPlayer: playerIndex } : null,
+            win: win? { winPlayer: playerId } : null,
             turn: { currentPlayer: this.playerTurn },
-            cells: response.map(v => ({ ...v, currentPlayer: playerIndex }))
+            cells: response.map(v => ({ ...v, currentPlayer: playerId }))
         };
     }
 
-    randomAttack(playerIndex: number): AttackResult {
+    randomAttack(playerId: number): AttackResult {
         const allCells: Cell[] = [];
         let freeCells: Cell[];
         for (let y = 0; y < ROWS_COUNT; y += 1) {
@@ -202,10 +202,10 @@ export class Game {
                 allCells.push({ x, y });
             }
         }
-        const field = this.players.get(this.getOpponent(playerIndex)).field;
+        const field = this.players.get(this.getOpponent(playerId)).field;
         freeCells = allCells.filter((cell) => !field.shots.find((shot) => cell.x === shot.x && cell.y === shot.y ));
         const cell = freeCells[random(0, freeCells.length - 1)];
 
-        return this.attack(playerIndex, cell.x, cell.y);
+        return this.attack(playerId, cell.x, cell.y);
     }
 }

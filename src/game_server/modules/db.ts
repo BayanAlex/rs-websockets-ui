@@ -4,7 +4,7 @@ import {
     UpdateRoomResponse, 
     UserData, 
     WinnerData 
-} from "./models/protocol";
+} from "../models/protocol";
 
 class User {
     constructor(
@@ -14,7 +14,7 @@ class User {
 }
 
 class Room {
-    constructor(public userIndex: number) {}
+    constructor(public userId: number) {}
 }
 
 export class DB {
@@ -24,32 +24,32 @@ export class DB {
     private winners = new Map<number, number>();
 
     regUser(name: string, password: string): UserData {
-        const existingUserIndex = this.users.findIndex(user => user.name === name);
-        if (existingUserIndex > -1) {
-            const user = this.users[existingUserIndex];
+        const existingUserId = this.users.findIndex(user => user.name === name);
+        if (existingUserId > -1) {
+            const user = this.users[existingUserId];
             if (password === user.password) {
-                return this.getUser(existingUserIndex);
+                return this.getUser(existingUserId);
             }
             return null;
         }
 
-        const index = this.users.length;
+        const id = this.users.length;
         const user = new User(name, password);
         this.users.push(user);
-        this.winners.set(index, 0);
+        this.winners.set(id, 0);
 
-        return this.getUser(index);
+        return this.getUser(id);
     }
 
-    getUser(index: number): UserData {
+    getUser(id: number): UserData {
         return {
-            index,
-            name: this.users[index].name,
+            index: id,
+            name: this.users[id].name,
         }
     }
 
-    addWinner(index: number): void {
-        this.winners.set(index, this.winners.get(index) + 1);
+    addWinner(id: number): void {
+        this.winners.set(id, this.winners.get(id) + 1);
     }
 
     getWinners(): WinnerData[] {
@@ -58,39 +58,39 @@ export class DB {
             .sort((a, b) => a.wins < b.wins ? 1 : -1);
     }
 
-    createRoom(userIndex: number): boolean {
-        if (this.rooms.find((room) => room.userIndex === userIndex)) {
+    createRoom(userId: number): boolean {
+        if (this.rooms.find((room) => room.userId === userId)) {
             return false;
         }
-        this.rooms.push(new Room(userIndex));
+        this.rooms.push(new Room(userId));
         return true;
     }
 
-    deleteRoom(roomIndex: number): void {
-        this.rooms.splice(roomIndex, 1);
+    deleteRoom(index: number): void {
+        this.rooms.splice(index, 1);
     }
 
     getRooms(): UpdateRoomResponse['data'] {
         return this.rooms.map((room, index) => {
             return {
                 roomId: index,
-                roomUsers: [{ index: room.userIndex }]
+                roomUsers: [{ index: room.userId }]
             }
         });
     }
 
-    createGame(userIndex: number, roomIndex?: number): GameData[] {
+    createGame(userId: number, roomId?: number): GameData[] {
         let game: Game;
         const idGame = this.games.length ? this.games[this.games.length - 1].id + 1 : 0;
-        if (roomIndex !== undefined) {
-            game = new Game(this.rooms[roomIndex].userIndex, userIndex, idGame);
-            this.deleteRoom(roomIndex);
+        if (roomId !== undefined) {
+            game = new Game(this.rooms[roomId].userId, userId, idGame);
+            this.deleteRoom(roomId);
         } else {
-            game = new Game(userIndex, -1, idGame);
+            game = new Game(userId, -1, idGame);
         }
-        const userRoomIndex = this.rooms.findIndex((room) => room.userIndex === userIndex);
-        if (userRoomIndex > -1) {
-            this.deleteRoom(userRoomIndex);
+        const userRoomId = this.rooms.findIndex((room) => room.userId === userId);
+        if (userRoomId > -1) {
+            this.deleteRoom(userRoomId);
         }
         this.games.push(game);
         

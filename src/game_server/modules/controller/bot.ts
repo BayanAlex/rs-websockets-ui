@@ -1,5 +1,5 @@
-import { AttackResult, AttackStatus } from "../models/game";
-import { ShipData } from "../models/protocol";
+import { AttackResult, AttackStatus } from "../../models/game";
+import { ShipData } from "../../models/protocol";
 import { random } from "../utils";
 import { COLUMNS_COUNT, Cell, Game, ROWS_COUNT } from "./game";
 

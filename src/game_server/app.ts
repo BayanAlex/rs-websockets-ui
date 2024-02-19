@@ -1,6 +1,6 @@
-import { Controller } from './controller/controller';
-import { DB } from './db';
-import { WsServer } from './server';
+import { Controller } from "./modules/controller/controller";
+import { DB } from "./modules/db";
+import { WsServer } from "./modules/server";
 
 export class App {
     constructor(port: number) {

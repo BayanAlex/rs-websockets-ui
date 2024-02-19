@@ -1,28 +1,28 @@
 import { WebSocket, WebSocketServer } from "ws";
 import { delay } from "./utils";
 import { Controller } from "./controller/controller";
-import { RegResponseError, RegResponseData } from "./models/protocol";
-import { ResponseObj } from "./models/controller";
+import { RegResponseError, RegResponseData } from "../models/protocol";
+import { ResponseObj } from "../models/controller";
 
 const BOT_SHOT_DELAY = 500;
 
 class WsClient {
-    constructor(public ws: WebSocket, public index: number) {}
+    constructor(public ws: WebSocket, public id: number) {}
 }
 
 class WsClients {
     private clients: WsClient[] = [];
 
-    add(ws: WebSocket, index: number) {
-        this.clients.push(new WsClient(ws, index));
+    add(ws: WebSocket, id: number) {
+        this.clients.push(new WsClient(ws, id));
     }
 
-    getIndex(ws: WebSocket) {
-        return this.clients.find(client => client.ws === ws)?.index ?? null;
+    getId(ws: WebSocket) {
+        return this.clients.find(client => client.ws === ws)?.id ?? null;
     }
 
-    getWs(index: number) {
-        return this.clients.find(client => client.index === index)?.ws;
+    getWs(id: number) {
+        return this.clients.find(client => client.id === id)?.ws;
     }
 
     delete(ws: WebSocket) {
@@ -65,7 +65,7 @@ export class WsServer {
             }
 
             if (response.receivers !== 'broadcast') {
-                console.log(`<- Sent to client id ${this.clients.getIndex(socket)}:`, response.payload, '\n');
+                console.log(`<- Sent to client id ${this.clients.getId(socket)}:`, response.payload, '\n');
             }
         };
         
@@ -83,7 +83,7 @@ export class WsServer {
             });
             
             ws.on('message', async (data: string) => {
-                const clientId = this.clients.getIndex(ws);
+                const clientId = this.clients.getId(ws);
                 console.log(`-> Received${clientId >= 0 ? ` from client id ${clientId}` : ''}:`, JSON.parse(data.toString()), '\n');
 
                 if (mute) {
@@ -91,7 +91,7 @@ export class WsServer {
                 }
 
                 mute = true;
-                const id = this.clients.getIndex(ws);
+                const id = this.clients.getId(ws);
                 const responses = this.controller.processRequest(id, data);
                 for (let i = 0; i < responses.length; i += 1) {
                     const response = responses[i];
@@ -118,7 +118,7 @@ export class WsServer {
             });
 
             ws.on('close', async () => {
-                const userId = this.clients.getIndex(ws);
+                const userId = this.clients.getId(ws);
                 this.clients.delete(ws);
                 console.log(`Client ${userId !== null ? `id ${userId} ` : ''}disconnected`);
                 const responses = this.controller.closeUserSessions(userId);
