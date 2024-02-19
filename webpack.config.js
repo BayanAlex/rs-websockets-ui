@@ -18,6 +18,12 @@ module.exports = {
         ]
     },
     resolve: { 
-        extensions: ['.ts']
+        extensions: ['.js', '.ts']
     },
+    externals: [
+        {
+            'utf-8-validate': 'commonjs utf-8-validate',
+            bufferutil: 'commonjs bufferutil',
+        },
+    ],
 }
