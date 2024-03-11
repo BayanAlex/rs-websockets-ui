@@ -1,0 +1,5 @@
+{
+    "watch": ["index.ts", "src/game_server"],
+    "ext": "ts",
+    "ignore": ["src/**/*.test.ts"]
+}
